@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 380px; font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; }
+
+    .header { padding: 14px 20px; background: #16213e; border-bottom: 1px solid #0f3460; }
+    .header h1 { font-size: 15px; color: #e94560; }
+    .header p { font-size: 10px; color: #666; margin-top: 2px; }
+
+    .section { padding: 14px 20px; border-bottom: 1px solid #0f3460; }
+    .section-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+    .input-group { margin-bottom: 10px; }
+    .input-group label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; }
+    .input-group input, .input-group select {
+      width: 100%; padding: 8px 10px; border-radius: 6px;
+      border: 1px solid #0f3460; background: #16213e; color: #e0e0e0;
+      font-size: 12px; outline: none; transition: border-color 0.2s;
+    }
+    .input-group input:focus, .input-group select:focus { border-color: #e94560; }
+    .input-group select option { background: #16213e; }
+
+    .lang-row { display: flex; gap: 10px; align-items: flex-end; }
+    .lang-row .input-group { flex: 1; margin-bottom: 0; }
+    .lang-arrow { font-size: 16px; color: #e94560; padding-bottom: 10px; flex-shrink: 0; }
+
+    .btn {
+      padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 12px; font-weight: 600; transition: all 0.2s;
+    }
+    .btn-start { background: #e94560; color: #fff; }
+    .btn-start:hover { background: #c73e54; }
+    .btn-start:disabled { background: #444; cursor: not-allowed; }
+    .btn-stop { background: #0f3460; color: #e0e0e0; }
+    .btn-stop:hover { background: #1a4a8a; }
+    .btn-stop:disabled { background: #222; color: #555; cursor: not-allowed; }
+    .btn-save { background: #533483; color: #e0e0e0; flex: 1; }
+    .btn-save:hover { background: #6a45a0; }
+    .btn-test { background: #2d5f2d; color: #e0e0e0; flex: 1; }
+    .btn-test:hover { background: #3a7a3a; }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    .status-bar {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; padding: 7px 12px; border-radius: 6px;
+      background: #16213e; font-size: 11px;
+    }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #444; flex-shrink: 0; }
+    .status-dot.active { background: #4caf50; animation: pulse 1s infinite; }
+    .status-dot.partial { background: #ff9800; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .vosk-status { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .vosk-indicator {
+      font-size: 10px; padding: 3px 8px; border-radius: 10px;
+    }
+    .vosk-indicator.connected { background: rgba(76,175,80,0.2); color: #4caf50; }
+    .vosk-indicator.disconnected { background: rgba(233,69,96,0.2); color: #e94560; }
+    .vosk-indicator.loading { background: rgba(255,152,0,0.2); color: #ff9800; }
+
+    .visualizer { height: 50px; background: #16213e; border-radius: 6px; overflow: hidden; }
+    .visualizer canvas { width: 100%; height: 100%; }
+
+    .level-meter { margin-top: 8px; }
+    .level-bar-bg { height: 4px; background: #16213e; border-radius: 2px; overflow: hidden; }
+    .level-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #4caf50, #ff9800, #e94560); border-radius: 2px; transition: width 0.1s; }
+    .level-label { font-size: 9px; color: #666; margin-top: 3px; }
+
+    .log-area { max-height: 80px; overflow-y: auto; }
+    .log-item { font-size: 10px; padding: 3px 0; border-bottom: 1px solid #0f3460; color: #888; }
+    .log-item .time { color: #555; margin-right: 5px; }
+    .log-item.success { color: #4caf50; }
+    .log-item.error { color: #e94560; }
+    .log-item.info { color: #64b5f6; }
+
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Language Agent</h1>
+    <p>Vosk 本地流式语音识别 &middot; v0.6.0</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">语言选择</div>
+    <div class="lang-row">
+      <div class="input-group">
+        <label>识别语言 (源)</label>
+        <select id="inputSourceLang">
+          <option value="en">English</option>
+          <option value="zh">中文</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="pt">Português</option>
+          <option value="ru">Русский</option>
+        </select>
+      </div>
+      <div class="lang-arrow">→</div>
+      <div class="input-group">
+        <label>翻译语言 (目标)</label>
+        <select id="inputTargetLang">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="ru">Русский</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Vosk 服务</div>
+    <div class="input-group">
+      <label>WebSocket 地址</label>
+      <input type="text" id="inputVoskUrl" value="ws://localhost:2700" placeholder="ws://localhost:2700" />
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-test" id="btnTestVosk">测试连接</button>
+    </div>
+    <div class="vosk-status">
+      <span class="vosk-indicator disconnected" id="voskIndicator">未连接</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">AI 翻译</div>
+    <div class="input-group">
+      <label>API Key</label>
+      <input type="password" id="inputApiKey" placeholder="sk-..." />
+    </div>
+    <div class="input-group">
+      <label>API Base URL</label>
+      <input type="text" id="inputApiBaseUrl" value="https://api.deepseek.com/v1/chat/completions" />
+    </div>
+    <div class="input-group">
+      <label>模型</label>
+      <input type="text" id="inputApiModel" value="deepseek-chat" />
+    </div>
+    <div class="input-group" style="display:flex;align-items:center;gap:8px;margin-bottom:0;">
+      <input type="checkbox" id="inputAiCorrection" style="width:auto;" />
+      <label for="inputAiCorrection" style="margin:0;cursor:pointer;">AI 轻纠正 (修正常见识别错误)</label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">音频抓取 + 实时转写</div>
+    <div class="btn-row">
+      <button class="btn btn-start" id="btnStart">开始</button>
+      <button class="btn btn-stop" id="btnStop" disabled>停止</button>
+    </div>
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">未开始</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">音频电平</div>
+    <div class="visualizer"><canvas id="visualizerCanvas"></canvas></div>
+    <div class="level-meter">
+      <div class="level-bar-bg"><div class="level-bar" id="levelBar"></div></div>
+      <div class="level-label">RMS: <span id="rmsValue">0.000</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">日志</div>
+    <div class="log-area" id="logArea"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
