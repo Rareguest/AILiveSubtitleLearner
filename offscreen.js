@@ -88,7 +88,12 @@ async function connectVosk() {
           chrome.runtime.sendMessage({ type: 'VOSK_PARTIAL', text: data.partial, lang: currentLang }).catch(() => {});
         }
         if (data.text !== undefined) {
-          chrome.runtime.sendMessage({ type: 'VOSK_FINAL', text: data.text, lang: currentLang }).catch(() => {});
+          chrome.runtime.sendMessage({
+            type: 'VOSK_FINAL',
+            text: data.text,
+            lang: currentLang,
+            words: data.result || null
+          }).catch(() => {});
         }
       } catch (e) {}
     };

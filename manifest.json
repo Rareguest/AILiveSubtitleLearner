@@ -4,7 +4,7 @@
   "version": "0.6.0",
   "description": "多语言实时流式语音识别+翻译 - Vosk本地识别",
   "permissions": ["activeTab", "tabCapture", "storage", "offscreen"],
-  "host_permissions": ["http://localhost:*/", "ws://localhost:*/"],
+  "host_permissions": ["http://localhost:*/", "ws://localhost:*/", "https://api.dictionaryapi.dev/", "https://*.wiktionary.org/"],
   "background": {
     "service_worker": "background.js"
   },

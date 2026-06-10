@@ -157,6 +157,21 @@ async function handleRequestTranslation(text, lang) {
   streamTranslate(corrected, lang);
 }
 
+async function chatAI(messages) {
+  const systemMsg = {
+    role: 'system',
+    content: '你是一个语言学习助手。用户正在观看外语视频并选中了部分文字。请帮助用户理解选中的内容，回答语法、用法、文化背景等问题。用中文回答，如果原文是外语请附上解析。'
+  };
+  const fullMessages = [systemMsg, ...messages];
+
+  await callAI(
+    fullMessages,
+    true,
+    (partial) => { forwardToTab({ type: 'CHAT_STREAM', text: partial }); },
+    (final) => { forwardToTab({ type: 'CHAT_DONE', text: final }); }
+  );
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'TAB_CAPTURE_STARTED') {
     captureActive = true;
@@ -201,6 +216,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'RESUME_VOSK') {
     chrome.runtime.sendMessage({ type: 'OFFSCREEN_RESUME_VOSK' }).catch(() => {});
+  }
+  if (msg.type === 'CHAT_ASK') {
+    chatAI(msg.messages);
   }
 });
 
