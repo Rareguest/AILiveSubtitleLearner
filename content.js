@@ -121,6 +121,22 @@
     return text.replace(/([\w''-]+)/g, '<span class="la-word">$1</span>');
   }
 
+  function syncToWebApp(type, data) {
+    chrome.storage.local.get(['webAppUrl', 'extApiKey', 'extUserId'], (res) => {
+      const baseUrl = (res.webAppUrl || 'http://localhost:3000').replace(/\/$/, '');
+      const extKey = res.extApiKey;
+      if (!extKey) return;
+      const endpoint = type === 'word' ? '/api/ext/sync-word' : '/api/ext/sync-sentence';
+      const headers = { 'Content-Type': 'application/json', 'X-Extension-Key': extKey };
+      if (res.extUserId) headers['X-User-Id'] = res.extUserId;
+      fetch(baseUrl + endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data)
+      }).catch(() => {});
+    });
+  }
+
   function createPanel() {
     panel = document.createElement('div');
     panel.id = 'language-agent-panel';
@@ -129,6 +145,7 @@
         <span id="la-title">Language Agent</span>
         <div id="la-controls">
           <button id="la-ask-btn" title="AI 问答">&#10067;</button>
+          <button id="la-web-btn" title="打开学习网页">&#127760;</button>
           <button id="la-trans-btn" title="显示/隐藏翻译">译</button>
           <button id="la-live-btn" title="回到最新进度" style="display:none;">▶▶ 直播</button>
           <button id="la-scroll-btn" title="回到底部">↓</button>
@@ -148,231 +165,256 @@
 
     const style = document.createElement('style');
     style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
       #language-agent-panel {
         position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
         width: 720px; max-height: 420px;
-        background: rgba(10, 10, 22, 0.96);
-        border: 1px solid rgba(233, 69, 96, 0.25); border-radius: 16px;
-        box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+        background: #f5f0e3;
+        border: 3px solid #4a4a4a; border-radius: 0;
+        box-shadow: 4px 4px 0 #4a4a4a;
         z-index: 2147483647;
-        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-        color: #e0e0e0; display: flex; flex-direction: column;
-        overflow: hidden; backdrop-filter: blur(16px);
-        transition: max-height 0.3s ease, width 0.3s ease;
+        font-family: 'Press Start 2P', 'Consolas', 'Courier New', monospace;
+        color: #2d2d2d; display: flex; flex-direction: column;
+        overflow: hidden; image-rendering: pixelated;
+        transition: max-height 0.15s steps(3), width 0.15s steps(3);
       }
-      #language-agent-panel.minimized { max-height: 44px; width: 220px; transform: translateX(-50%); }
+      #language-agent-panel.minimized { max-height: 44px; width: 280px; transform: translateX(-50%); }
       #language-agent-panel.minimized #la-body,
       #language-agent-panel.minimized #la-footer { display: none; }
       #la-header {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 10px 18px; background: rgba(22, 33, 62, 0.9);
-        cursor: move; user-select: none; flex-shrink: 0;
+        padding: 8px 14px; background: #e0d8c0;
+        border-bottom: 3px solid #4a4a4a; cursor: move; user-select: none; flex-shrink: 0;
       }
-      #la-title { font-size: 13px; font-weight: 700; color: #e94560; letter-spacing: 0.5px; }
-      #la-controls { display: flex; gap: 4px; }
+      #la-title { font-size: 10px; font-weight: 400; color: #c0392b; letter-spacing: 1px; }
+      #la-controls { display: flex; gap: 2px; }
       #la-controls button {
-        background: none; border: none; color: #888; cursor: pointer;
-        font-size: 14px; padding: 2px 8px; border-radius: 4px; transition: all 0.2s;
+        background: #e8e0d0; border: 2px solid #4a4a4a; color: #2d2d2d; cursor: pointer;
+        font-family: 'Press Start 2P', monospace; font-size: 10px;
+        padding: 3px 8px; border-radius: 0; box-shadow: 2px 2px 0 #4a4a4a;
       }
-      #la-controls button:hover { color: #e0e0e0; background: rgba(255,255,255,0.1); }
-      #la-ask-btn { font-size: 13px !important; }
-      #la-trans-btn.off { color: #555; }
-      #la-trans-btn.on { color: #64b5f6; background: rgba(100,181,246,0.15); }
+      #la-controls button:hover { background: #d0c8b8; }
+      #la-controls button:active { box-shadow: none; transform: translate(2px, 2px); }
+      #la-ask-btn { font-size: 9px !important; }
+      #la-trans-btn.off { color: #aaa; }
+      #la-trans-btn.on { color: #2980b9; background: #d4e6f1; }
       #la-live-btn {
-        color: #e94560; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
-        background: rgba(233,69,96,0.12); border-radius: 4px; padding: 2px 8px;
+        color: #c0392b; font-size: 8px; background: #fadbd8;
       }
-      #la-live-btn:hover { background: rgba(233,69,96,0.25); }
-      #la-body { flex: 1; overflow-y: auto; padding: 12px 18px; min-height: 160px; }
+      #la-live-btn:hover { background: #f5b7b1; }
+      #la-body { flex: 1; overflow-y: auto; padding: 10px 14px; min-height: 160px; background: #faf6ec; }
       #la-subtitle-list { display: flex; flex-direction: column; gap: 8px; }
 
       .la-item-group {
-        padding: 10px 14px; background: rgba(255,255,255,0.04);
-        border-radius: 10px; border-left: 4px solid #4caf50;
-        animation: la-fadein 0.15s ease;
-        transition: background 0.15s, border-left-color 0.15s;
-        position: relative;
+        padding: 10px 12px; background: #fff;
+        border: 2px solid #b0a890; border-left: 5px solid #27ae60;
+        border-radius: 0; position: relative;
+        animation: la-fadein 0.1s steps(2);
       }
-      .la-item-group.partial-group { border-left-color: #ff9800; }
+      .la-item-group.partial-group { border-left-color: #f39c12; background: #fef9ef; }
       .la-item-group.replaying {
-        background: rgba(233, 69, 96, 0.12);
-        border-left-color: #e94560;
-        box-shadow: 0 0 0 1px rgba(233, 69, 96, 0.2);
+        background: #fadbd8; border-left-color: #c0392b;
+        box-shadow: inset 0 0 0 1px #c0392b;
       }
 
       .la-source-text {
-        font-size: 20px; line-height: 1.5; word-break: break-word;
-        color: #f0f0f0; font-weight: 500; cursor: text; user-select: text;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 18px; line-height: 1.6; word-break: break-word;
+        color: #2d2d2d; font-weight: 600; cursor: text; user-select: text;
       }
-      .la-source-text.partial { color: #999; font-weight: 400; font-size: 18px; cursor: default; user-select: none; }
+      .la-source-text.partial { color: #999; font-weight: 400; font-size: 16px; cursor: default; user-select: none; }
       .la-source-text.partial .la-cursor {
-        display: inline-block; width: 2px; height: 18px;
-        background: #ff9800; margin-left: 3px; vertical-align: middle;
-        animation: la-blink 0.8s infinite;
+        display: inline-block; width: 8px; height: 16px;
+        background: #f39c12; margin-left: 2px; vertical-align: middle;
+        animation: la-blink 0.8s steps(1) infinite;
       }
-      .la-word { cursor: pointer; border-radius: 3px; transition: background 0.15s; padding: 0 1px; }
-      .la-word:hover { background: rgba(233, 69, 96, 0.2); }
+      .la-word { cursor: pointer; border-radius: 0; padding: 0 2px; }
+      .la-word:hover { background: #fadbd8; }
 
       .la-translation-text {
-        font-size: 16px; line-height: 1.4; word-break: break-word;
-        color: #64b5f6; margin-top: 5px; padding-top: 5px;
-        border-top: 1px dashed rgba(100, 181, 246, 0.2);
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 14px; line-height: 1.5; word-break: break-word;
+        color: #2980b9; margin-top: 6px; padding-top: 6px;
+        border-top: 2px dashed #d4e6f1;
       }
-      .la-translation-text.placeholder { color: #3a3a3a; font-style: italic; font-size: 14px; }
+      .la-translation-text.placeholder { color: #ccc; font-style: italic; font-size: 12px; }
       .la-translation-text.hidden { display: none; }
       .la-translation-text.streaming .la-trans-cursor {
-        display: inline-block; width: 2px; height: 14px;
-        background: #64b5f6; margin-left: 2px; vertical-align: middle;
-        animation: la-blink 0.6s infinite;
+        display: inline-block; width: 8px; height: 12px;
+        background: #2980b9; margin-left: 2px; vertical-align: middle;
+        animation: la-blink 0.6s steps(1) infinite;
       }
 
       .la-item-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-      .la-lang-label { font-size: 10px; color: #555; }
+      .la-lang-label { font-family: 'Press Start 2P', monospace; font-size: 8px; color: #888; }
       .la-replay-btn {
+        font-family: 'Press Start 2P', monospace;
         display: inline-flex; align-items: center; justify-content: center;
-        gap: 5px; min-width: 72px; padding: 4px 14px;
-        font-size: 12px; font-weight: 600; color: #ccc;
-        background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 16px; cursor: pointer; transition: all 0.2s; user-select: none;
+        gap: 5px; min-width: 72px; padding: 4px 12px;
+        font-size: 9px; color: #2d2d2d;
+        background: #e8e0d0; border: 2px solid #4a4a4a;
+        border-radius: 0; cursor: pointer; user-select: none;
+        box-shadow: 2px 2px 0 #4a4a4a;
       }
-      .la-replay-btn:hover {
-        background: rgba(233, 69, 96, 0.15);
-        border-color: rgba(233, 69, 96, 0.4); color: #e94560;
-      }
-      .la-replay-btn.playing {
-        background: rgba(233, 69, 96, 0.2);
-        border-color: rgba(233, 69, 96, 0.5); color: #e94560;
-      }
-      .la-replay-btn.paused {
-        background: rgba(255, 152, 0, 0.15);
-        border-color: rgba(255, 152, 0, 0.4); color: #ff9800;
-      }
-      .la-time-label { font-size: 10px; color: #444; margin-left: auto; }
+      .la-replay-btn:hover { background: #fadbd8; }
+      .la-replay-btn:active { box-shadow: none; transform: translate(2px, 2px); }
+      .la-replay-btn.playing { background: #fadbd8; color: #c0392b; }
+      .la-replay-btn.paused { background: #fef9ef; color: #f39c12; }
+      .la-time-label { font-family: 'Press Start 2P', monospace; font-size: 8px; color: #aaa; margin-left: auto; }
 
       @keyframes la-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
       @keyframes la-fadein {
-        from { opacity: 0; transform: translateY(4px); }
-        to { opacity: 1; transform: translateY(0); }
+        from { opacity: 0; } to { opacity: 1; }
       }
 
       #la-ctx-menu {
         position: fixed; z-index: 2147483646;
-        padding: 4px 0; background: rgba(18, 18, 36, 0.98);
-        border: 1px solid rgba(233, 69, 96, 0.3); border-radius: 8px;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.5);
-        font-family: 'Segoe UI', system-ui, sans-serif;
-        backdrop-filter: blur(12px); min-width: 140px;
+        padding: 2px; background: #f5f0e3;
+        border: 3px solid #4a4a4a; border-radius: 0;
+        box-shadow: 3px 3px 0 #4a4a4a;
+        font-family: 'Press Start 2P', monospace; min-width: 160px;
       }
       .la-ctx-item {
-        padding: 8px 16px; color: #e0e0e0; font-size: 13px;
+        padding: 8px 14px; color: #2d2d2d; font-size: 9px;
         cursor: pointer; display: flex; align-items: center; gap: 8px;
-        transition: background 0.15s;
+        border: 1px solid transparent;
       }
-      .la-ctx-item:hover { background: rgba(233, 69, 96, 0.15); color: #e94560; }
+      .la-ctx-item:hover { background: #fadbd8; border-color: #c0392b; color: #c0392b; }
 
       #la-dict-card {
         position: fixed; z-index: 2147483647;
         width: 300px; padding: 14px 16px;
-        background: rgba(18, 18, 36, 0.98);
-        border: 1px solid rgba(100, 181, 246, 0.3); border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-        font-family: 'Segoe UI', system-ui, sans-serif; color: #e0e0e0;
-        backdrop-filter: blur(12px);
+        background: #f5f0e3; border: 3px solid #4a4a4a; border-radius: 0;
+        box-shadow: 4px 4px 0 #4a4a4a;
+        font-family: 'Consolas', 'Courier New', monospace; color: #2d2d2d;
       }
       .la-dict-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-      .la-dict-word { font-size: 22px; font-weight: 700; color: #f0f0f0; }
-      .la-dict-phonetic { font-size: 14px; color: #aaa; font-style: italic; }
+      .la-dict-word { font-family: 'Press Start 2P', monospace; font-size: 16px; font-weight: 400; color: #2d2d2d; }
+      .la-dict-phonetic { font-size: 13px; color: #888; font-style: italic; }
       .la-dict-audio-btn {
-        background: rgba(100,181,246,0.15); border: none; color: #64b5f6;
-        cursor: pointer; font-size: 16px; padding: 2px 8px; border-radius: 50%;
-        transition: background 0.2s;
+        background: #e8e0d0; border: 2px solid #4a4a4a; color: #2980b9;
+        cursor: pointer; font-size: 12px; padding: 2px 8px; border-radius: 0;
+        font-family: monospace;
       }
-      .la-dict-audio-btn:hover { background: rgba(100,181,246,0.3); }
+      .la-dict-audio-btn:hover { background: #d4e6f1; }
+      .la-dict-audio-btn:active { transform: translate(1px, 1px); }
       .la-dict-definitions { display: flex; flex-direction: column; gap: 6px; }
-      .la-dict-pos { font-size: 11px; color: #e94560; font-weight: 600; text-transform: uppercase; }
-      .la-dict-def { font-size: 13px; color: #ccc; line-height: 1.4; padding-left: 8px; border-left: 2px solid #333; }
-      .la-dict-loading { font-size: 13px; color: #666; font-style: italic; }
-      .la-dict-error { font-size: 13px; color: #e94560; }
-      .la-dict-source { font-size: 9px; color: #444; margin-top: 6px; text-align: right; }
+      .la-dict-pos { font-family: 'Press Start 2P', monospace; font-size: 8px; color: #c0392b; text-transform: uppercase; }
+      .la-dict-def { font-size: 13px; color: #2d2d2d; line-height: 1.4; padding-left: 8px; border-left: 3px solid #b0a890; }
+      .la-dict-loading { font-family: 'Press Start 2P', monospace; font-size: 9px; color: #aaa; }
+      .la-dict-error { font-family: 'Press Start 2P', monospace; font-size: 9px; color: #c0392b; }
+      .la-dict-source { font-family: 'Press Start 2P', monospace; font-size: 7px; color: #bbb; margin-top: 8px; text-align: right; }
+      .la-dict-ai-btn {
+        display: block; margin-top: 10px; padding: 6px 12px;
+        background: #fadbd8; border: 2px solid #c0392b; color: #c0392b;
+        font-family: 'Press Start 2P', monospace; font-size: 8px;
+        cursor: pointer; text-align: center; box-shadow: 2px 2px 0 #c0392b;
+      }
+      .la-dict-ai-btn:hover { background: #f5b7b1; }
+      .la-dict-ai-btn:active { box-shadow: none; transform: translate(2px, 2px); }
 
       #la-chat-panel {
         position: fixed; z-index: 2147483647;
         width: 440px; height: 520px;
-        background: rgba(12, 12, 24, 0.98);
-        border: 1px solid rgba(233, 69, 96, 0.3); border-radius: 16px;
-        box-shadow: 0 12px 48px rgba(0,0,0,0.6);
-        font-family: 'Segoe UI', system-ui, sans-serif; color: #e0e0e0;
+        background: #f5f0e3; border: 3px solid #4a4a4a; border-radius: 0;
+        box-shadow: 4px 4px 0 #4a4a4a;
+        font-family: 'Consolas', 'Courier New', monospace; color: #2d2d2d;
         display: flex; flex-direction: column; overflow: hidden;
-        backdrop-filter: blur(16px); top: 80px; left: 50%; transform: translateX(-50%);
+        top: 80px; left: 50%; transform: translateX(-50%);
       }
       #la-chat-header {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 12px 16px; background: rgba(22, 33, 62, 0.9);
-        border-bottom: 1px solid rgba(233,69,96,0.2); flex-shrink: 0;
+        padding: 10px 14px; background: #e0d8c0;
+        border-bottom: 3px solid #4a4a4a; flex-shrink: 0;
         cursor: move; user-select: none;
       }
-      #la-chat-title { font-size: 14px; font-weight: 700; color: #e94560; }
+      #la-chat-title { font-family: 'Press Start 2P', monospace; font-size: 10px; color: #c0392b; }
       #la-chat-close {
-        background: none; border: none; color: #888; cursor: pointer;
-        font-size: 16px; padding: 2px 8px; border-radius: 4px;
+        background: #e8e0d0; border: 2px solid #4a4a4a; color: #2d2d2d; cursor: pointer;
+        font-family: monospace; font-size: 14px; padding: 2px 8px; border-radius: 0;
+        box-shadow: 2px 2px 0 #4a4a4a;
       }
-      #la-chat-close:hover { color: #e0e0e0; background: rgba(255,255,255,0.1); }
+      #la-chat-close:hover { background: #d0c8b8; }
+      #la-chat-close:active { box-shadow: none; transform: translate(2px, 2px); }
       #la-chat-context {
-        padding: 8px 16px; background: rgba(100,181,246,0.06);
-        border-bottom: 1px solid rgba(100,181,246,0.15);
-        font-size: 13px; color: #64b5f6; line-height: 1.4;
+        padding: 8px 14px; background: #fef9ef;
+        border-bottom: 2px solid #b0a890;
+        font-size: 12px; color: #2980b9; line-height: 1.4;
         max-height: 80px; overflow-y: auto; flex-shrink: 0;
       }
-      #la-chat-context-label { font-size: 10px; color: #555; margin-bottom: 4px; }
+      #la-chat-context-label { font-family: 'Press Start 2P', monospace; font-size: 7px; color: #aaa; margin-bottom: 4px; }
       #la-chat-messages {
-        flex: 1; overflow-y: auto; padding: 12px 16px;
-        display: flex; flex-direction: column; gap: 10px;
+        flex: 1; overflow-y: auto; padding: 10px 14px;
+        display: flex; flex-direction: column; gap: 8px; background: #faf6ec;
       }
-      .la-chat-msg { font-size: 13px; line-height: 1.5; word-break: break-word; padding: 8px 12px; border-radius: 10px; }
-      .la-chat-msg.user { background: rgba(233,69,96,0.12); align-self: flex-end; max-width: 85%; }
-      .la-chat-msg.assistant { background: rgba(255,255,255,0.05); align-self: flex-start; max-width: 90%; }
-      .la-chat-msg.system { background: rgba(100,181,246,0.08); color: #64b5f6; font-size: 11px; align-self: center; }
+      .la-chat-msg { font-size: 12px; line-height: 1.5; word-break: break-word; padding: 8px 10px; border-radius: 0; }
+      .la-chat-msg.user { background: #fadbd8; align-self: flex-end; max-width: 85%; border: 2px solid #c0392b; }
+      .la-chat-msg.assistant { background: #fff; align-self: flex-start; max-width: 90%; border: 2px solid #b0a890; }
+      .la-chat-msg.assistant p { margin: 0 0 6px 0; }
+      .la-chat-msg.assistant p:last-child { margin-bottom: 0; }
+      .la-chat-msg.assistant strong { color: #c0392b; }
+      .la-chat-msg.assistant em { color: #2980b9; }
+      .la-chat-msg.assistant .la-inline-code {
+        background: #e8e0d0; padding: 1px 5px; border: 1px solid #4a4a4a;
+        font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #2d2d2d;
+      }
+      .la-chat-msg.assistant pre {
+        background: #2d2d2d; padding: 8px 10px; border: 2px solid #4a4a4a;
+        overflow-x: auto; margin: 6px 0; color: #f5f0e3;
+      }
+      .la-chat-msg.assistant pre code {
+        font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #f5f0e3;
+      }
+      .la-chat-msg.assistant .la-md-h1 { font-family: 'Press Start 2P', monospace; font-size: 12px; color: #c0392b; margin: 8px 0 4px; }
+      .la-chat-msg.assistant .la-md-h2 { font-size: 13px; font-weight: 700; color: #2d2d2d; margin: 6px 0 3px; }
+      .la-chat-msg.assistant .la-md-h3 { font-size: 12px; font-weight: 600; color: #555; margin: 4px 0 2px; }
+      .la-chat-msg.assistant .la-md-li { padding-left: 10px; border-left: 3px solid #c0392b; margin: 2px 0; }
+      .la-chat-msg.system { background: #d4e6f1; color: #2980b9; font-size: 9px; align-self: center; border: 1px solid #2980b9; }
       .la-chat-msg.streaming .la-chat-cursor {
-        display: inline-block; width: 2px; height: 12px;
-        background: #4caf50; margin-left: 2px; vertical-align: middle;
-        animation: la-blink 0.6s infinite;
+        display: inline-block; width: 8px; height: 12px;
+        background: #27ae60; margin-left: 2px; vertical-align: middle;
+        animation: la-blink 0.6s steps(1) infinite;
       }
       #la-chat-input-row {
-        display: flex; gap: 8px; padding: 12px 16px;
-        background: rgba(22, 33, 62, 0.9); border-top: 1px solid rgba(233,69,96,0.2); flex-shrink: 0;
+        display: flex; gap: 6px; padding: 10px 14px;
+        background: #e0d8c0; border-top: 3px solid #4a4a4a; flex-shrink: 0;
       }
       #la-chat-input {
-        flex: 1; padding: 8px 12px; border-radius: 8px;
-        border: 1px solid #0f3460; background: #16213e; color: #e0e0e0;
-        font-size: 13px; outline: none; resize: none; min-height: 36px; max-height: 80px;
+        flex: 1; padding: 6px 10px; border-radius: 0;
+        border: 2px solid #4a4a4a; background: #faf6ec; color: #2d2d2d;
+        font-family: 'Consolas', monospace; font-size: 12px; outline: none; resize: none; min-height: 36px; max-height: 80px;
       }
-      #la-chat-input:focus { border-color: #e94560; }
+      #la-chat-input:focus { border-color: #c0392b; }
       #la-chat-send {
-        padding: 8px 18px; border: none; border-radius: 8px;
-        background: #e94560; color: #fff; font-size: 13px; font-weight: 600;
-        cursor: pointer; transition: background 0.2s; white-space: nowrap;
+        padding: 6px 16px; border: 2px solid #4a4a4a; border-radius: 0;
+        background: #fadbd8; color: #c0392b;
+        font-family: 'Press Start 2P', monospace; font-size: 9px;
+        cursor: pointer; box-shadow: 2px 2px 0 #4a4a4a; white-space: nowrap;
       }
-      #la-chat-send:hover { background: #c73e54; }
-      #la-chat-send:disabled { background: #444; cursor: not-allowed; }
+      #la-chat-send:hover { background: #f5b7b1; }
+      #la-chat-send:active { box-shadow: none; transform: translate(2px, 2px); }
+      #la-chat-send:disabled { background: #ddd; color: #aaa; cursor: not-allowed; }
 
       #la-footer {
         display: flex; align-items: center; gap: 8px;
-        padding: 8px 18px; background: rgba(22, 33, 62, 0.6); flex-shrink: 0;
+        padding: 6px 14px; background: #e0d8c0; border-top: 2px solid #b0a890; flex-shrink: 0;
       }
-      .la-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #555; flex-shrink: 0; }
-      .la-status-dot.active { background: #4caf50; animation: la-pulse 1s infinite; }
-      .la-status-dot.partial { background: #ff9800; animation: la-pulse 1s infinite; }
-      .la-status-dot.replaying { background: #e94560; animation: la-pulse 0.6s infinite; }
-      @keyframes la-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-      #la-status-text { font-size: 11px; color: #888; flex: 1; }
+      .la-status-dot { width: 8px; height: 8px; border-radius: 0; background: #ccc; flex-shrink: 0; border: 1px solid #4a4a4a; }
+      .la-status-dot.active { background: #27ae60; animation: la-pulse 1s steps(1) infinite; }
+      .la-status-dot.partial { background: #f39c12; animation: la-pulse 1s steps(1) infinite; }
+      .la-status-dot.replaying { background: #c0392b; animation: la-pulse 0.6s steps(1) infinite; }
+      @keyframes la-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      #la-status-text { font-family: 'Press Start 2P', monospace; font-size: 8px; color: #888; flex: 1; }
       #la-lang-badge {
-        font-size: 10px; padding: 2px 10px; border-radius: 10px;
-        background: rgba(233, 69, 96, 0.15); color: #e94560;
+        font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 2px 8px;
+        background: #fadbd8; color: #c0392b; border: 2px solid #c0392b;
       }
 
-      #la-body::-webkit-scrollbar, #la-chat-messages::-webkit-scrollbar, #la-chat-context::-webkit-scrollbar { width: 4px; }
-      #la-body::-webkit-scrollbar-track, #la-chat-messages::-webkit-scrollbar-track, #la-chat-context::-webkit-scrollbar-track { background: transparent; }
-      #la-body::-webkit-scrollbar-thumb, #la-chat-messages::-webkit-scrollbar-thumb, #la-chat-context::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+      #la-body::-webkit-scrollbar, #la-chat-messages::-webkit-scrollbar, #la-chat-context::-webkit-scrollbar { width: 10px; }
+      #la-body::-webkit-scrollbar-track, #la-chat-messages::-webkit-scrollbar-track, #la-chat-context::-webkit-scrollbar-track { background: #e8e0d0; }
+      #la-body::-webkit-scrollbar-thumb, #la-chat-messages::-webkit-scrollbar-thumb, #la-chat-context::-webkit-scrollbar-thumb { background: #b0a890; border: 2px solid #e8e0d0; }
+      #la-body::-webkit-scrollbar-thumb:hover, #la-chat-messages::-webkit-scrollbar-thumb:hover { background: #999; }
     `;
 
     document.documentElement.appendChild(style);
@@ -419,6 +461,11 @@
     });
     document.getElementById('la-live-btn').addEventListener('click', () => { returnToLive(); });
     document.getElementById('la-ask-btn').addEventListener('click', () => { openChat(''); });
+    document.getElementById('la-web-btn').addEventListener('click', () => {
+      chrome.storage.local.get(['webAppUrl'], (res) => {
+        window.open(res.webAppUrl || 'http://localhost:3000', '_blank');
+      });
+    });
   }
 
   function setupWordClick() {
@@ -460,10 +507,10 @@
       ctxMenu.id = 'la-ctx-menu';
       document.documentElement.appendChild(ctxMenu);
     }
-    ctxMenu.innerHTML = '<div class="la-ctx-item" data-action="ask-ai">🤖 问 AI</div>';
+    ctxMenu.innerHTML = '<div class="la-ctx-item" data-action="ask-ai">🤖 问 AI</div><div class="la-ctx-item" data-action="save-word">⭐ 收藏单词</div><div class="la-ctx-item" data-action="save-sentence">⭐ 收藏句子</div>';
     ctxMenu.style.display = '';
     if (x + 160 > window.innerWidth) x = window.innerWidth - 170;
-    if (y + 40 > window.innerHeight) y = window.innerHeight - 50;
+    if (y + 80 > window.innerHeight) y = window.innerHeight - 90;
     ctxMenu.style.left = `${x}px`;
     ctxMenu.style.top = `${y}px`;
 
@@ -471,6 +518,16 @@
       window.getSelection().removeAllRanges();
       hideCtxMenu();
       openChat(text);
+    });
+    ctxMenu.querySelector('[data-action="save-word"]').addEventListener('click', () => {
+      window.getSelection().removeAllRanges();
+      hideCtxMenu();
+      syncToWebApp('word', { word: text.split(/\s+/)[0], lang: currentLang, notes: text });
+    });
+    ctxMenu.querySelector('[data-action="save-sentence"]').addEventListener('click', () => {
+      window.getSelection().removeAllRanges();
+      hideCtxMenu();
+      syncToWebApp('sentence', { sourceText: text, sourceLang: currentLang, videoUrl: location.href, timestamp: getVideoTime() });
     });
   }
 
@@ -521,7 +578,8 @@
           html += `<div class="la-dict-def">${def.definition}</div>`;
         }
       }
-      html += '</div><div class="la-dict-source">Free Dictionary API</div>';
+      html += '</div><button class="la-dict-ai-btn" data-word="' + entry.word + '">🤖 Ask AI</button>';
+      html += '<div class="la-dict-source">Free Dictionary API</div>';
       dictCard.innerHTML = html;
       const audioBtn = dictCard.querySelector('.la-dict-audio-btn');
       if (audioBtn) {
@@ -531,8 +589,24 @@
           dictAudio.play();
         });
       }
+      const aiBtn = dictCard.querySelector('.la-dict-ai-btn');
+      if (aiBtn) {
+        aiBtn.addEventListener('click', () => {
+          const w = aiBtn.dataset.word;
+          hideDictCard();
+          syncToWebApp('word', { word: w, lang: currentLang, phonetic: phonetic || '' });
+          openChat('', `关于单词 "${w}"：`);
+        });
+      }
     } catch (e) {
-      dictCard.innerHTML = `<div class="la-dict-word">${word}</div><div class="la-dict-error">未找到释义</div>`;
+      let html = `<div class="la-dict-word">${word}</div><div class="la-dict-error">未找到释义</div>`;
+      html += `<button class="la-dict-ai-btn" data-word="${word}">🤖 Ask AI</button>`;
+      dictCard.innerHTML = html;
+      dictCard.querySelector('.la-dict-ai-btn').addEventListener('click', () => {
+        hideDictCard();
+        syncToWebApp('word', { word: word, lang: currentLang });
+        openChat('', `关于单词 "${word}"：`);
+      });
     }
   }
 
@@ -541,7 +615,7 @@
       const res = await fetch(`https://${lang}.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`);
       if (!res.ok) throw new Error('not found');
       const data = await res.json();
-      let html = '<div class="la-dict-header"><span class="la-dict-word">${word}</span></div><div class="la-dict-definitions">';
+      let html = `<div class="la-dict-header"><span class="la-dict-word">${word}</span></div><div class="la-dict-definitions">`;
       const defs = data[lang] || [];
       for (const section of defs.slice(0, 2)) {
         const pos = section.partOfSpeech || '';
@@ -551,10 +625,24 @@
           if (text) html += `<div class="la-dict-def">${text}</div>`;
         }
       }
-      html += '</div><div class="la-dict-source">Wiktionary</div>';
+      html += '</div><button class="la-dict-ai-btn" data-word="' + word + '">🤖 Ask AI</button>';
+      html += '<div class="la-dict-source">Wiktionary</div>';
       dictCard.innerHTML = html;
+      const aiBtn = dictCard.querySelector('.la-dict-ai-btn');
+      if (aiBtn) {
+        aiBtn.addEventListener('click', () => {
+          hideDictCard();
+          openChat('', `关于单词 "${word}"：`);
+        });
+      }
     } catch (e) {
-      dictCard.innerHTML = `<div class="la-dict-word">${word}</div><div class="la-dict-error">未找到释义</div>`;
+      let html = `<div class="la-dict-word">${word}</div><div class="la-dict-error">未找到释义</div>`;
+      html += `<button class="la-dict-ai-btn" data-word="${word}">🤖 Ask AI</button>`;
+      dictCard.innerHTML = html;
+      dictCard.querySelector('.la-dict-ai-btn').addEventListener('click', () => {
+        hideDictCard();
+        openChat('', `关于单词 "${word}"：`);
+      });
     }
   }
 
@@ -580,7 +668,7 @@
     document.addEventListener('mouseup', () => { chatDragging = false; chatPanel.style.transition = ''; });
   }
 
-  function openChat(selectedText) {
+  function openChat(selectedText, prefillInput) {
     if (!chatPanel) {
       chatPanel = document.createElement('div');
       chatPanel.id = 'la-chat-panel';
@@ -620,7 +708,12 @@
       contextDiv.style.display = 'none';
     }
 
-    document.getElementById('la-chat-input').focus();
+    const input = document.getElementById('la-chat-input');
+    if (prefillInput) {
+      input.value = prefillInput;
+      input.setSelectionRange(prefillInput.length, prefillInput.length);
+    }
+    input.focus();
   }
 
   async function sendChatMessage() {
@@ -657,11 +750,32 @@
     });
   }
 
+  function renderMd(text) {
+    let html = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="la-code-$1">$2</code></pre>')
+      .replace(/`([^`\n]+)`/g, '<code class="la-inline-code">$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>')
+      .replace(/^### (.+)$/gm, '<div class="la-md-h3">$1</div>')
+      .replace(/^## (.+)$/gm, '<div class="la-md-h2">$1</div>')
+      .replace(/^# (.+)$/gm, '<div class="la-md-h1">$1</div>')
+      .replace(/^[-*] (.+)$/gm, '<div class="la-md-li">• $1</div>')
+      .replace(/^\d+\. (.+)$/gm, '<div class="la-md-li">$1</div>')
+      .replace(/\n{2,}/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    return '<p>' + html + '</p>';
+  }
+
   function addChatMsg(role, text) {
     const messages = document.getElementById('la-chat-messages');
     const div = document.createElement('div');
     div.className = `la-chat-msg ${role}`;
-    div.textContent = text;
+    if (role === 'assistant') {
+      div.innerHTML = renderMd(text);
+    } else {
+      div.textContent = text;
+    }
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
     return div;
@@ -723,6 +837,7 @@
       createSubtitleItem(sent.text, lang, startTime, endTime);
     }
     firstSentence = false;
+    syncToWebApp('sentence', { sourceText: text, sourceLang: lang, videoUrl: location.href, timestamp: getVideoTime() });
     chrome.runtime.sendMessage({ type: 'REQUEST_TRANSLATION', text, lang });
   }
 
@@ -954,7 +1069,7 @@
     if (msg.type === 'CHAT_STREAM') {
       const msgs = document.querySelectorAll('.la-chat-msg.assistant.streaming');
       if (msgs.length > 0) {
-        msgs[0].innerHTML = msg.text + '<span class="la-chat-cursor"></span>';
+        msgs[0].innerHTML = renderMd(msg.text) + '<span class="la-chat-cursor"></span>';
         document.getElementById('la-chat-messages').scrollTop = document.getElementById('la-chat-messages').scrollHeight;
       }
     }
@@ -962,7 +1077,7 @@
     if (msg.type === 'CHAT_DONE') {
       const msgs = document.querySelectorAll('.la-chat-msg.assistant.streaming');
       if (msgs.length > 0) {
-        msgs[0].textContent = msg.text;
+        msgs[0].innerHTML = renderMd(msg.text);
         msgs[0].classList.remove('streaming');
         chatHistory.push({ role: 'assistant', content: msg.text });
         const sendBtn = document.getElementById('la-chat-send');

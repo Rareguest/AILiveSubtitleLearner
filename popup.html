@@ -3,84 +3,87 @@
 <head>
   <meta charset="UTF-8" />
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 380px; font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; }
+    body { width: 380px; font-family: 'Consolas', 'Courier New', monospace; background: #f5f0e3; color: #2d2d2d; }
 
-    .header { padding: 14px 20px; background: #16213e; border-bottom: 1px solid #0f3460; }
-    .header h1 { font-size: 15px; color: #e94560; }
-    .header p { font-size: 10px; color: #666; margin-top: 2px; }
+    .header { padding: 12px 18px; background: #e0d8c0; border-bottom: 3px solid #4a4a4a; }
+    .header h1 { font-family: 'Press Start 2P', monospace; font-size: 11px; color: #c0392b; letter-spacing: 1px; }
+    .header p { font-family: 'Press Start 2P', monospace; font-size: 7px; color: #888; margin-top: 4px; }
 
-    .section { padding: 14px 20px; border-bottom: 1px solid #0f3460; }
-    .section-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .section { padding: 12px 18px; border-bottom: 2px solid #b0a890; }
+    .section-title { font-family: 'Press Start 2P', monospace; font-size: 8px; color: #888; letter-spacing: 1px; margin-bottom: 8px; }
 
-    .input-group { margin-bottom: 10px; }
-    .input-group label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; }
+    .input-group { margin-bottom: 8px; }
+    .input-group label { display: block; font-size: 11px; color: #666; margin-bottom: 3px; }
     .input-group input, .input-group select {
-      width: 100%; padding: 8px 10px; border-radius: 6px;
-      border: 1px solid #0f3460; background: #16213e; color: #e0e0e0;
-      font-size: 12px; outline: none; transition: border-color 0.2s;
+      width: 100%; padding: 6px 10px; border-radius: 0;
+      border: 2px solid #4a4a4a; background: #faf6ec; color: #2d2d2d;
+      font-family: 'Consolas', monospace; font-size: 12px; outline: none;
     }
-    .input-group input:focus, .input-group select:focus { border-color: #e94560; }
-    .input-group select option { background: #16213e; }
+    .input-group input:focus, .input-group select:focus { border-color: #c0392b; }
+    .input-group select option { background: #faf6ec; }
 
-    .lang-row { display: flex; gap: 10px; align-items: flex-end; }
+    .lang-row { display: flex; gap: 8px; align-items: flex-end; }
     .lang-row .input-group { flex: 1; margin-bottom: 0; }
-    .lang-arrow { font-size: 16px; color: #e94560; padding-bottom: 10px; flex-shrink: 0; }
+    .lang-arrow { font-family: 'Press Start 2P', monospace; font-size: 12px; color: #c0392b; padding-bottom: 10px; flex-shrink: 0; }
 
     .btn {
-      padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
-      font-size: 12px; font-weight: 600; transition: all 0.2s;
+      font-family: 'Press Start 2P', monospace;
+      padding: 6px 14px; border: 2px solid #4a4a4a; border-radius: 0; cursor: pointer;
+      font-size: 9px; box-shadow: 2px 2px 0 #4a4a4a; transition: none;
     }
-    .btn-start { background: #e94560; color: #fff; }
-    .btn-start:hover { background: #c73e54; }
-    .btn-start:disabled { background: #444; cursor: not-allowed; }
-    .btn-stop { background: #0f3460; color: #e0e0e0; }
-    .btn-stop:hover { background: #1a4a8a; }
-    .btn-stop:disabled { background: #222; color: #555; cursor: not-allowed; }
-    .btn-save { background: #533483; color: #e0e0e0; flex: 1; }
-    .btn-save:hover { background: #6a45a0; }
-    .btn-test { background: #2d5f2d; color: #e0e0e0; flex: 1; }
-    .btn-test:hover { background: #3a7a3a; }
+    .btn:active { box-shadow: none; transform: translate(2px, 2px); }
+    .btn-start { background: #fadbd8; color: #c0392b; border-color: #c0392b; box-shadow: 2px 2px 0 #c0392b; }
+    .btn-start:hover { background: #f5b7b1; }
+    .btn-start:disabled { background: #ddd; color: #aaa; border-color: #999; box-shadow: none; cursor: not-allowed; transform: none; }
+    .btn-stop { background: #e8e0d0; color: #2d2d2d; }
+    .btn-stop:hover { background: #d0c8b8; }
+    .btn-stop:disabled { background: #ddd; color: #aaa; border-color: #999; box-shadow: none; cursor: not-allowed; transform: none; }
+    .btn-test { background: #d5f5e3; color: #1e8449; border-color: #1e8449; box-shadow: 2px 2px 0 #1e8449; }
+    .btn-test:hover { background: #abebc6; }
 
     .btn-row { display: flex; gap: 8px; }
     .btn-row .btn { flex: 1; }
 
     .status-bar {
       display: flex; align-items: center; gap: 8px;
-      margin-top: 10px; padding: 7px 12px; border-radius: 6px;
-      background: #16213e; font-size: 11px;
+      margin-top: 8px; padding: 6px 10px; border: 2px solid #4a4a4a;
+      background: #faf6ec; font-size: 11px;
     }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #444; flex-shrink: 0; }
-    .status-dot.active { background: #4caf50; animation: pulse 1s infinite; }
-    .status-dot.partial { background: #ff9800; animation: pulse 1s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .status-dot { width: 8px; height: 8px; border-radius: 0; background: #ccc; flex-shrink: 0; border: 1px solid #4a4a4a; }
+    .status-dot.active { background: #27ae60; animation: pulse 1s steps(1) infinite; }
+    .status-dot.partial { background: #f39c12; animation: pulse 1s steps(1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
     .vosk-status { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .vosk-indicator {
-      font-size: 10px; padding: 3px 8px; border-radius: 10px;
+      font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 3px 8px;
+      border: 2px solid #4a4a4a;
     }
-    .vosk-indicator.connected { background: rgba(76,175,80,0.2); color: #4caf50; }
-    .vosk-indicator.disconnected { background: rgba(233,69,96,0.2); color: #e94560; }
-    .vosk-indicator.loading { background: rgba(255,152,0,0.2); color: #ff9800; }
+    .vosk-indicator.connected { background: #d5f5e3; color: #1e8449; border-color: #1e8449; }
+    .vosk-indicator.disconnected { background: #fadbd8; color: #c0392b; border-color: #c0392b; }
+    .vosk-indicator.loading { background: #fef9ef; color: #f39c12; border-color: #f39c12; }
 
-    .visualizer { height: 50px; background: #16213e; border-radius: 6px; overflow: hidden; }
-    .visualizer canvas { width: 100%; height: 100%; }
+    .visualizer { height: 50px; background: #faf6ec; border: 2px solid #4a4a4a; overflow: hidden; }
+    .visualizer canvas { width: 100%; height: 100%; image-rendering: pixelated; }
 
     .level-meter { margin-top: 8px; }
-    .level-bar-bg { height: 4px; background: #16213e; border-radius: 2px; overflow: hidden; }
-    .level-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #4caf50, #ff9800, #e94560); border-radius: 2px; transition: width 0.1s; }
-    .level-label { font-size: 9px; color: #666; margin-top: 3px; }
+    .level-bar-bg { height: 6px; background: #e8e0d0; border: 1px solid #4a4a4a; overflow: hidden; }
+    .level-bar { height: 100%; width: 0%; background: #27ae60; transition: width 0.1s steps(3); }
+    .level-label { font-family: 'Press Start 2P', monospace; font-size: 7px; color: #aaa; margin-top: 3px; }
 
     .log-area { max-height: 80px; overflow-y: auto; }
-    .log-item { font-size: 10px; padding: 3px 0; border-bottom: 1px solid #0f3460; color: #888; }
-    .log-item .time { color: #555; margin-right: 5px; }
-    .log-item.success { color: #4caf50; }
-    .log-item.error { color: #e94560; }
-    .log-item.info { color: #64b5f6; }
+    .log-item { font-size: 10px; padding: 3px 0; border-bottom: 1px dashed #b0a890; color: #888; }
+    .log-item .time { color: #aaa; margin-right: 5px; }
+    .log-item.success { color: #1e8449; }
+    .log-item.error { color: #c0392b; }
+    .log-item.info { color: #2980b9; }
 
-    ::-webkit-scrollbar { width: 3px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    ::-webkit-scrollbar { width: 10px; }
+    ::-webkit-scrollbar-track { background: #e8e0d0; }
+    ::-webkit-scrollbar-thumb { background: #b0a890; border: 2px solid #e8e0d0; }
+    ::-webkit-scrollbar-thumb:hover { background: #999; }
   </style>
 </head>
 <body>
@@ -152,6 +155,25 @@
     <div class="input-group" style="display:flex;align-items:center;gap:8px;margin-bottom:0;">
       <input type="checkbox" id="inputAiCorrection" style="width:auto;" />
       <label for="inputAiCorrection" style="margin:0;cursor:pointer;">AI 轻纠正 (修正常见识别错误)</label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">学习网页</div>
+    <div class="input-group">
+      <label>网页地址</label>
+      <input type="text" id="inputWebAppUrl" value="http://localhost:3000" placeholder="http://localhost:3000" />
+    </div>
+    <div class="input-group">
+      <label>扩展 API Key (网页端生成)</label>
+      <input type="text" id="inputExtApiKey" placeholder="la-ext-..." />
+    </div>
+    <div class="input-group">
+      <label>用户 ID (网页端用户 ID)</label>
+      <input type="number" id="inputExtUserId" placeholder="1" />
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-start" id="btnOpenWeb">打开网页</button>
     </div>
   </div>
 

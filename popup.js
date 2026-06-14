@@ -15,6 +15,9 @@ const inputApiBaseUrl = document.getElementById('inputApiBaseUrl');
 const inputApiModel = document.getElementById('inputApiModel');
 const inputAiCorrection = document.getElementById('inputAiCorrection');
 const voskIndicator = document.getElementById('voskIndicator');
+const inputWebAppUrl = document.getElementById('inputWebAppUrl');
+const inputExtApiKey = document.getElementById('inputExtApiKey');
+const btnOpenWeb = document.getElementById('btnOpenWeb');
 
 const canvasCtx = visualizerCanvas.getContext('2d');
 
@@ -44,18 +47,16 @@ function setVoskIndicator(state) {
 function drawVisualization(rms) {
   const w = visualizerCanvas.width / 2;
   const h = visualizerCanvas.height / 2;
-  canvasCtx.fillStyle = '#16213e';
+  canvasCtx.fillStyle = '#faf6ec';
   canvasCtx.fillRect(0, 0, w, h);
   const barCount = 28;
-  const barWidth = (w - (barCount - 1) * 2) / barCount;
+  const barWidth = Math.floor((w - (barCount - 1) * 2) / barCount);
   for (let i = 0; i < barCount; i++) {
     const barH = Math.max(2, rms * h * 4 * (0.5 + Math.random() * 0.5));
     const x = i * (barWidth + 2);
     const y = h - barH;
-    const gradient = canvasCtx.createLinearGradient(x, y, x, h);
-    gradient.addColorStop(0, '#e94560');
-    gradient.addColorStop(1, '#0f3460');
-    canvasCtx.fillStyle = gradient;
+    const ratio = barH / h;
+    canvasCtx.fillStyle = ratio > 0.7 ? '#c0392b' : ratio > 0.4 ? '#f39c12' : '#27ae60';
     canvasCtx.fillRect(x, y, barWidth, barH);
   }
 }
@@ -63,12 +64,13 @@ function drawVisualization(rms) {
 function updateLevel(rms) {
   const pct = Math.min(100, rms * 500);
   levelBar.style.width = `${pct}%`;
+  levelBar.style.background = pct > 70 ? '#c0392b' : pct > 40 ? '#f39c12' : '#27ae60';
   rmsValue.textContent = rms.toFixed(4);
   drawVisualization(rms);
 }
 
 function loadSettings() {
-  chrome.storage.local.get(['voskUrl', 'sourceLang', 'targetLang', 'apiKey', 'apiBaseUrl', 'apiModel', 'aiCorrection'], (res) => {
+  chrome.storage.local.get(['voskUrl', 'sourceLang', 'targetLang', 'apiKey', 'apiBaseUrl', 'apiModel', 'aiCorrection', 'webAppUrl', 'extApiKey'], (res) => {
     if (res.voskUrl) inputVoskUrl.value = res.voskUrl;
     if (res.sourceLang) inputSourceLang.value = res.sourceLang;
     if (res.targetLang) inputTargetLang.value = res.targetLang;
@@ -76,6 +78,8 @@ function loadSettings() {
     if (res.apiBaseUrl) inputApiBaseUrl.value = res.apiBaseUrl;
     if (res.apiModel) inputApiModel.value = res.apiModel;
     if (res.aiCorrection) inputAiCorrection.checked = true;
+    if (res.webAppUrl) inputWebAppUrl.value = res.webAppUrl;
+    if (res.extApiKey) inputExtApiKey.value = res.extApiKey;
   });
 }
 
@@ -87,11 +91,13 @@ function saveSettings() {
   const apiBaseUrl = inputApiBaseUrl.value.trim();
   const apiModel = inputApiModel.value.trim();
   const aiCorrection = inputAiCorrection.checked;
-  chrome.storage.local.set({ voskUrl, sourceLang, targetLang, apiKey, apiBaseUrl, apiModel, aiCorrection });
-  return { voskUrl, sourceLang, targetLang, apiKey, apiBaseUrl, apiModel, aiCorrection };
+  const webAppUrl = inputWebAppUrl.value.trim();
+  const extApiKey = inputExtApiKey.value.trim();
+  chrome.storage.local.set({ voskUrl, sourceLang, targetLang, apiKey, apiBaseUrl, apiModel, aiCorrection, webAppUrl, extApiKey });
+  return { voskUrl, sourceLang, targetLang, apiKey, apiBaseUrl, apiModel, aiCorrection, webAppUrl, extApiKey };
 }
 
-[inputVoskUrl, inputApiKey, inputApiBaseUrl, inputApiModel].forEach((el) => {
+[inputVoskUrl, inputApiKey, inputApiBaseUrl, inputApiModel, inputWebAppUrl, inputExtApiKey].forEach((el) => {
   el.addEventListener('change', () => {
     saveSettings();
     log('设置已自动保存', 'success');
@@ -112,6 +118,13 @@ inputSourceLang.addEventListener('change', () => {
 inputTargetLang.addEventListener('change', () => {
   saveSettings();
   log('设置已自动保存', 'success');
+});
+
+btnOpenWeb.addEventListener('click', () => {
+  saveSettings();
+  const url = inputWebAppUrl.value.trim() || 'http://localhost:3000';
+  chrome.tabs.create({ url });
+  log('已打开学习网页', 'success');
 });
 
 btnTestVosk.addEventListener('click', async () => {
