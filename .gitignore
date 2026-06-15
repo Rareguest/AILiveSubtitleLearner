@@ -1,0 +1,21 @@
+# Dependencies
+language-web/frontend/node_modules/
+
+# Build output
+language-web/frontend/dist/
+language-web/backend/target/
+
+# IDE
+.idea/
+*.iml
+
+# Vosk models (too large)
+language/server/vosk-model-*/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+*.env
+application-local.yml
