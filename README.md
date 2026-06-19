@@ -2,6 +2,14 @@
 
 多语言实时语音识别 + 翻译 + 学习管理平台。
 
+## 演示视频
+
+- **B站链接：**
+
+  BV1qDjh64Ewd
+  
+  [2026课程设计作品说明视频_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV1qDjh64Ewd/?vd_source=db529e83a4f2c1f182e59d61f52cc6fb)
+
 ## 项目结构
 
 ```
